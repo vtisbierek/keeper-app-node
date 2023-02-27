@@ -56,7 +56,11 @@ app.get("/handleGoogleRedirect", async (req, res) => {
       const accessToken = tokens.access_token;
       const refreshToken = tokens.refresh_token;
 
-      Persistent.updateOne({selector: 1}, { authStatus: true });
+      console.log("voltou");
+
+      Persistent.updateOne({selector: 1}, { authStatus: true }, (err, result) => {
+        console.log(result, "res");
+      });
   
       res.redirect(
         process.env.CLIENT_URL + `?accessToken=${accessToken}&refreshToken=${refreshToken}`
@@ -107,28 +111,38 @@ app.get("/checkAuthLink", async (req, res) => {
     if(err){
       console.log(err);
     } else{
+      console.log(foundOne.authStatus, "authStatus for checking");
       res.send(foundOne.authStatus);
     }
   });
 });
 
 app.post("/revokeAuthLink", (req, res) => {
+  console.log("se foi 1");
   if(req.body.auth === "revoke"){
-    Persistent.updateOne({selector: 1}, { authStatus: false });
+    console.log("se foi 2");
+    Persistent.updateOne({selector: 1}, {authStatus: false}, (err, result) => {
+      if(!err){
+        console.log("se foi 3");
+      }
+    });
   }
 });
 
 app.route("/")
     .get((req, res) => {
-      Persistent.updateOne({selector: 1}, { author: req.query.author });
-      Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
-        if(!err){
-            res.json(foundNotes);
-        }    
+      Persistent.updateOne({selector: 1}, { author: req.query.author }, (err, result) => {
+        Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
+          if(!err){
+              res.json(foundNotes);
+          }    
+        });
       });
     })
     .post((req, res) => {
       Persistent.findOne({selector: 1}, (err, foundOne) => {
+        console.log(foundOne, "foundone");
+        console.log(foundOne.author, "author");
         if(err){
           console.log(err);
         } else{
