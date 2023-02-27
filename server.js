@@ -18,22 +18,29 @@ mongoose.connect(process.env.MONGODB_URL, {useNewUrlParser: true}, () => {
 });
 
 const noteSchema = new mongoose.Schema(
-    {
-        title: String,
-        content: String,
-        author: String
-    }
+  {
+    title: String,
+    content: String,
+    author: String
+  }
 )
 
 const Note = new mongoose.model("Note", noteSchema);
+
+const persistentSchema = new mongoose.Schema(
+  {
+    authStatus: Boolean,
+    author: String,
+  }
+)
+
+const Persistent = new mongoose.model("Persistent", persistentSchema);
 
 const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     process.env.SERVER_URL + "/handleGoogleRedirect" // server redirect url handler
 );
-
-let userAuth = false;
 
 app.get("/handleGoogleRedirect", async (req, res) => {
     // get code from url
@@ -48,7 +55,7 @@ app.get("/handleGoogleRedirect", async (req, res) => {
       const accessToken = tokens.access_token;
       const refreshToken = tokens.refresh_token;
 
-      userAuth = true;
+      Persistent.updateOne({}, { authStatus: true });
   
       res.redirect(
         process.env.CLIENT_URL + `?accessToken=${accessToken}&refreshToken=${refreshToken}`
@@ -95,34 +102,44 @@ app.post("/createAuthLink", cors(), (req, res) => {
 });
 
 app.get("/checkAuthLink", async (req, res) => {
-  res.send(userAuth);
+  Persistent.findOne({}, (err, foundOne) => {
+    if(err){
+      console.log(err);
+    } else{
+      res.send(foundOne.authStatus);
+    }
+  });
 });
 
 app.post("/revokeAuthLink", (req, res) => {
   if(req.body.auth === "revoke"){
-    userAuth = false;
+    Persistent.updateOne({}, { authStatus: false });
   }
 });
 
-let author;
-
 app.route("/")
     .get((req, res) => {
-        author = req.query.author;
-        Note.find({author: {$eq: author}}, (err, foundNotes) => {
-            if(!err){
-                res.json(foundNotes);
-            }    
-        })
+      Persistent.updateOne({}, { author: req.query.author });
+      Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
+        if(!err){
+            res.json(foundNotes);
+        }    
+      });
     })
     .post((req, res) => {
-        Note.deleteMany({author: author}, (err) => {
+      Persistent.findOne({}, (err, foundOne) => {
+        if(err){
+          console.log(err);
+        } else{
+          Note.deleteMany({author: foundOne.author}, (err) => {
             if(!err){
               Note.insertMany(req.body);
             } else {
               console.log(err);
             }
-        });
+          });
+        }
+      });
     });
 
 app.listen(8000, function(){
