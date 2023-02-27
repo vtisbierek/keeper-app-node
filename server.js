@@ -31,6 +31,7 @@ const persistentSchema = new mongoose.Schema(
   {
     authStatus: Boolean,
     author: String,
+    selector: Number
   }
 )
 
@@ -55,7 +56,7 @@ app.get("/handleGoogleRedirect", async (req, res) => {
       const accessToken = tokens.access_token;
       const refreshToken = tokens.refresh_token;
 
-      Persistent.updateOne({}, { authStatus: true });
+      Persistent.updateOne({selector: 1}, { authStatus: true });
   
       res.redirect(
         process.env.CLIENT_URL + `?accessToken=${accessToken}&refreshToken=${refreshToken}`
@@ -102,7 +103,7 @@ app.post("/createAuthLink", cors(), (req, res) => {
 });
 
 app.get("/checkAuthLink", async (req, res) => {
-  Persistent.findOne({}, (err, foundOne) => {
+  Persistent.findOne({selector: 1}, (err, foundOne) => {
     if(err){
       console.log(err);
     } else{
@@ -113,13 +114,13 @@ app.get("/checkAuthLink", async (req, res) => {
 
 app.post("/revokeAuthLink", (req, res) => {
   if(req.body.auth === "revoke"){
-    Persistent.updateOne({}, { authStatus: false });
+    Persistent.updateOne({selector: 1}, { authStatus: false });
   }
 });
 
 app.route("/")
     .get((req, res) => {
-      Persistent.updateOne({}, { author: req.query.author });
+      Persistent.updateOne({selector: 1}, { author: req.query.author });
       Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
         if(!err){
             res.json(foundNotes);
@@ -127,7 +128,7 @@ app.route("/")
       });
     })
     .post((req, res) => {
-      Persistent.findOne({}, (err, foundOne) => {
+      Persistent.findOne({selector: 1}, (err, foundOne) => {
         if(err){
           console.log(err);
         } else{
