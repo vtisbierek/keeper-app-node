@@ -12,6 +12,8 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.urlencoded({extended: true}));
 
+const ONE_HOUR = 60 * 60 * 1000; //ms
+
 mongoose.set('strictQuery', false); 
 mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, () => {
     console.log("Connected to KeeperDB");
@@ -20,7 +22,8 @@ mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, 
 const noteSchema = new mongoose.Schema(
     {
         title: String,
-        content: String
+        content: String,
+        author: String
     }
 )
 
@@ -31,6 +34,8 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_SECRET,
     "http://localhost:8000/handleGoogleRedirect" // server redirect url handler
 );
+
+let userAuth = false;
 
 app.get("/handleGoogleRedirect", async (req, res) => {
     // get code from url
@@ -44,6 +49,8 @@ app.get("/handleGoogleRedirect", async (req, res) => {
       }
       const accessToken = tokens.access_token;
       const refreshToken = tokens.refresh_token;
+
+      userAuth = true;
   
       res.redirect(
         `http://localhost:3000?accessToken=${accessToken}&refreshToken=${refreshToken}`
@@ -89,24 +96,33 @@ app.post("/createAuthLink", cors(), (req, res) => {
     res.send({ url });
 });
 
+app.get("/checkAuthLink", async (req, res) => {
+  res.send(userAuth);
+});
+
+app.post("/revokeAuthLink", (req, res) => {
+  if(req.body.auth === "revoke"){
+    userAuth = false;
+  }
+});
+
+let author;
+
 app.route("/")
     .get((req, res) => {
-        Note.find({}, (err, foundNotes) => {
+        author = req.query.author;
+        Note.find({author: {$eq: author}}, (err, foundNotes) => {
             if(!err){
                 res.json(foundNotes);
             }    
         })
-
-        //res.json({ title: "Hello Jung-Hyun!", content: "I love you!" });
     })
     .post((req, res) => {
-        Note.deleteMany({}, err => {
+        Note.deleteMany({author: author}, (err) => {
             if(!err){
-                Note.insertMany(req.body);
-                console.log(req.body);
-                console.log("yo");
+              Note.insertMany(req.body);
             } else {
-                console.log(err);
+              console.log(err);
             }
         });
     });
