@@ -12,10 +12,8 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.urlencoded({extended: true}));
 
-const ONE_HOUR = 60 * 60 * 1000; //ms
-
 mongoose.set('strictQuery', false); 
-mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, () => {
+mongoose.connect(process.env.MONGODB_URL, {useNewUrlParser: true}, () => {
     console.log("Connected to KeeperDB");
 });
 
@@ -32,7 +30,7 @@ const Note = new mongoose.model("Note", noteSchema);
 const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    "http://localhost:8000/handleGoogleRedirect" // server redirect url handler
+    process.env.SERVER_URL + "/handleGoogleRedirect" // server redirect url handler
 );
 
 let userAuth = false;
@@ -53,7 +51,7 @@ app.get("/handleGoogleRedirect", async (req, res) => {
       userAuth = true;
   
       res.redirect(
-        `http://localhost:3000?accessToken=${accessToken}&refreshToken=${refreshToken}`
+        process.env.CLIENT_URL + `?accessToken=${accessToken}&refreshToken=${refreshToken}`
       );
     });
 });
