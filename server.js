@@ -16,6 +16,9 @@ mongoose.set('strictQuery', false);
 mongoose.connect(process.env.MONGODB_URL, {useNewUrlParser: true}, () => {
     console.log("Connected to KeeperDB");
 });
+/* mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, () => {
+    console.log("Connected to KeeperDB Local");
+}); */
 
 const noteSchema = new mongoose.Schema(
   {
@@ -55,12 +58,6 @@ app.get("/handleGoogleRedirect", async (req, res) => {
       }
       const accessToken = tokens.access_token;
       const refreshToken = tokens.refresh_token;
-
-      console.log("voltou");
-
-      Persistent.updateOne({selector: 1}, { authStatus: true }, (err, result) => {
-        console.log(result, "res");
-      });
   
       res.redirect(
         process.env.CLIENT_URL + `?accessToken=${accessToken}&refreshToken=${refreshToken}`
@@ -107,52 +104,55 @@ app.post("/createAuthLink", cors(), (req, res) => {
 });
 
 app.get("/checkAuthLink", async (req, res) => {
-  Persistent.findOne({selector: 1}, (err, foundOne) => {
-    if(err){
-      console.log(err);
-    } else{
-      console.log(foundOne.authStatus, "authStatus for checking");
+  console.log("check 2");
+  console.log(req.query.author, "busca pelo autor no auth check");
+  Persistent.findOne({author: req.query.author}, (err, foundOne) => {
+    if(foundOne !== null) {
+      console.log(foundOne, "foundOne do auth check");
+      console.log(foundOne.authStatus, "authStatus returned");
       res.send(foundOne.authStatus);
+    } else {
+      res.send(false);
     }
   });
 });
 
 app.post("/revokeAuthLink", (req, res) => {
-  console.log("se foi 1");
-  if(req.body.auth === "revoke"){
-    console.log("se foi 2");
-    Persistent.updateOne({selector: 1}, {authStatus: false}, (err, result) => {
-      if(!err){
-        console.log("se foi 3");
-      }
-    });
-  }
+  Persistent.updateOne({author: req.body.author}, {authStatus: false}, (err, result) => {
+    if(!err){
+      console.log("revoked");
+    }
+  });
 });
 
 app.route("/")
     .get((req, res) => {
-      Persistent.updateOne({selector: 1}, { author: req.query.author }, (err, result) => {
-        Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
-          if(!err){
-              res.json(foundNotes);
-          }    
-        });
+      console.log(req.query.author, "check 1");
+      Persistent.findOne({author: req.query.author}, (err, foundOne) => {
+        if(foundOne === null){
+          if(req.query.author !== "undefined"){
+            Persistent.create({authStatus: true, author: req.query.author});
+          }
+        } else{
+          Persistent.updateOne({author: req.query.author}, {authStatus: true}, (err, result) => {
+            Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
+              if(!err){
+                  console.log(foundNotes, "foundNotes");
+                  res.json(foundNotes);
+              }    
+            });
+          });
+        }
       });
     })
     .post((req, res) => {
-      Persistent.findOne({selector: 1}, (err, foundOne) => {
-        console.log(foundOne, "foundone");
-        console.log(foundOne.author, "author");
-        if(err){
+      const author = req.body.pop();
+
+      Note.deleteMany({author: author}, (err) => {
+        if(!err){
+          Note.insertMany(req.body);
+        } else {
           console.log(err);
-        } else{
-          Note.deleteMany({author: foundOne.author}, (err) => {
-            if(!err){
-              Note.insertMany(req.body);
-            } else {
-              console.log(err);
-            }
-          });
         }
       });
     });
