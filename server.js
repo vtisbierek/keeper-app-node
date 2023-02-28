@@ -13,12 +13,12 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({extended: true}));
 
 mongoose.set('strictQuery', false); 
-mongoose.connect(process.env.MONGODB_URL, {useNewUrlParser: true}, () => {
+/* mongoose.connect(process.env.MONGODB_URL, {useNewUrlParser: true}, () => {
     console.log("Connected to KeeperDB");
-});
-/* mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, () => {
-    console.log("Connected to KeeperDB Local");
 }); */
+mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, () => {
+    console.log("Connected to KeeperDB Local");
+});
 
 const noteSchema = new mongoose.Schema(
   {
@@ -30,15 +30,22 @@ const noteSchema = new mongoose.Schema(
 
 const Note = new mongoose.model("Note", noteSchema);
 
-const persistentSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
-    authStatus: Boolean,
-    author: String,
-    selector: Number
+    author: String
   }
 )
 
-const Persistent = new mongoose.model("Persistent", persistentSchema);
+const User = new mongoose.model("User", userSchema);
+
+const sessionSchema = new mongoose.Schema(
+  {
+    token: String,
+    authorization: Boolean
+  }
+)
+
+const Session = new mongoose.model("Session", sessionSchema);
 
 const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -103,22 +110,26 @@ app.post("/createAuthLink", cors(), (req, res) => {
     res.send({ url });
 });
 
-app.get("/checkAuthLink", async (req, res) => {
-  console.log("check 2");
-  console.log(req.query.author, "busca pelo autor no auth check");
-  Persistent.findOne({author: req.query.author}, (err, foundOne) => {
-    if(foundOne !== null) {
-      console.log(foundOne, "foundOne do auth check");
-      console.log(foundOne.authStatus, "authStatus returned");
-      res.send(foundOne.authStatus);
-    } else {
-      res.send(false);
-    }
+app.route("/checkAuthLink")
+  .get(async (req, res) => {
+    console.log(req.query.token, "token check");
+    Session.findOne({token: req.query.token}, (err, foundOne) => {
+      res.send(foundOne.authorization);
+    });
+  })
+  .post((req, res) => {
+    console.log(req.body, req.body.token, "token create");
+    Session.findOne({token: req.body.token}, (err, foundOne) => {
+      if(foundOne === null){
+        Session.create({token: req.body.token, authorization: true});
+      } else{
+        Session.updateOne({token: foundOne.token}, {authorization: true});
+      }
+    });
   });
-});
 
 app.post("/revokeAuthLink", (req, res) => {
-  Persistent.updateOne({author: req.body.author}, {authStatus: false}, (err, result) => {
+  Session.updateOne({token: req.body.token}, {authorization: false}, (err, result) => {
     if(!err){
       console.log("revoked");
     }
@@ -127,20 +138,15 @@ app.post("/revokeAuthLink", (req, res) => {
 
 app.route("/")
     .get((req, res) => {
-      console.log(req.query.author, "check 1");
-      Persistent.findOne({author: req.query.author}, (err, foundOne) => {
+      User.findOne({author: req.query.author}, (err, foundOne) => {
         if(foundOne === null){
-          if(req.query.author !== "undefined"){
-            Persistent.create({authStatus: true, author: req.query.author});
-          }
+          User.create({author: req.query.author});
         } else{
-          Persistent.updateOne({author: req.query.author}, {authStatus: true}, (err, result) => {
-            Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
-              if(!err){
-                  console.log(foundNotes, "foundNotes");
-                  res.json(foundNotes);
-              }    
-            });
+          Note.find({author: {$eq: req.query.author}}, (err, foundNotes) => {
+            if(!err){
+                console.log(foundNotes, "foundNotes");
+                res.json(foundNotes);
+            }    
           });
         }
       });
