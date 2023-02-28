@@ -13,12 +13,12 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({extended: true}));
 
 mongoose.set('strictQuery', false); 
-/* mongoose.connect(process.env.MONGODB_URL, {useNewUrlParser: true}, () => {
+mongoose.connect(process.env.MONGODB_URL, {useNewUrlParser: true}, () => {
     console.log("Connected to KeeperDB");
-}); */
-mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, () => {
-    console.log("Connected to KeeperDB Local");
 });
+/* mongoose.connect("mongodb://127.0.0.1:27017/keeperDB", {useNewUrlParser: true}, () => {
+    console.log("Connected to KeeperDB Local");
+}); */
 
 const noteSchema = new mongoose.Schema(
   {
